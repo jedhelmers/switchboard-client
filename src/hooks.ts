@@ -32,6 +32,7 @@ import {
   type PresignResponse,
   type User,
   type Workspace,
+  type WorkspaceMembership,
 } from './client'
 
 // ---- auth ------------------------------------------------------------------
@@ -1440,6 +1441,39 @@ export function useOpDeleteUser() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: string) => api.del(`/v1/operator/users/${id}`),
+    onSuccess: () => invalidateOperator(qc),
+  })
+}
+
+export function useOpAddWorkspaceMember(workspaceID: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (vars: { user_id: string; role?: WorkspaceMembership['role'] }) =>
+      api.post<WorkspaceMembership>(
+        `/v1/operator/workspaces/${workspaceID}/members`,
+        vars,
+      ),
+    onSuccess: () => invalidateOperator(qc),
+  })
+}
+
+export function useOpUpdateMemberRole(workspaceID: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (vars: { user_id: string; role: WorkspaceMembership['role'] }) =>
+      api.patch<WorkspaceMembership>(
+        `/v1/operator/workspaces/${workspaceID}/members/${vars.user_id}`,
+        { role: vars.role },
+      ),
+    onSuccess: () => invalidateOperator(qc),
+  })
+}
+
+export function useOpRemoveWorkspaceMember(workspaceID: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (userID: string) =>
+      api.del(`/v1/operator/workspaces/${workspaceID}/members/${userID}`),
     onSuccess: () => invalidateOperator(qc),
   })
 }

@@ -351,3 +351,9 @@ export type OperatorAuditEntry = {
   user_agent?: string
   created_at?: string
 }
+
+export type WorkspaceMembership = {
+  workspace_id: string
+  user_id: string
+  role: 'owner' | 'admin' | 'member' | 'guest' | 'bot'
+}
