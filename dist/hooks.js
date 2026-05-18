@@ -1212,6 +1212,16 @@ export function useOpDeleteUser() {
         onSuccess: () => invalidateOperator(qc),
     });
 }
+export function useOpUpdateUser() {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (vars) => {
+            const { id, ...body } = vars;
+            return api.patch(`/v1/operator/users/${id}`, body);
+        },
+        onSuccess: () => invalidateOperator(qc),
+    });
+}
 export function useOpResetUserPassword() {
     const qc = useQueryClient();
     return useMutation({

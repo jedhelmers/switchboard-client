@@ -159,6 +159,12 @@ export declare function useOpForceLogoutUser(): import("@tanstack/react-query").
     revoked: number;
 }, Error, string, unknown>;
 export declare function useOpDeleteUser(): import("@tanstack/react-query").UseMutationResult<unknown, Error, string, unknown>;
+export declare function useOpUpdateUser(): import("@tanstack/react-query").UseMutationResult<OperatorUser, Error, {
+    id: string;
+    display_name?: string;
+    email?: string;
+    is_operator?: boolean;
+}, unknown>;
 export declare function useOpResetUserPassword(): import("@tanstack/react-query").UseMutationResult<void, Error, {
     id: string;
     new_password: string;

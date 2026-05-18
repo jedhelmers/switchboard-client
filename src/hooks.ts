@@ -1455,6 +1455,22 @@ export function useOpDeleteUser() {
   })
 }
 
+export function useOpUpdateUser() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (vars: {
+      id: string
+      display_name?: string
+      email?: string
+      is_operator?: boolean
+    }) => {
+      const { id, ...body } = vars
+      return api.patch<OperatorUser>(`/v1/operator/users/${id}`, body)
+    },
+    onSuccess: () => invalidateOperator(qc),
+  })
+}
+
 export function useOpResetUserPassword() {
   const qc = useQueryClient()
   return useMutation({
