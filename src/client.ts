@@ -1,11 +1,12 @@
-// Tiny fetch wrapper. Cookie is HttpOnly + same-origin, so we just need
-// credentials: 'include' so the browser sends it.
-//
-// `configure()` lets consumers point the client at any server. The default
-// `/api` assumes the app is served behind a reverse proxy that forwards /api
-// to the Stack server — which is how the bundled web app is deployed. For
-// any other shape (cross-origin SPA, native shell, etc.) call configure()
-// during app bootstrap.
+// Tiny fetch wrapper. Two auth modes, picked by configure():
+//   • Cookie (default) — HttpOnly + same-origin. Browser sends it; we just
+//     set credentials: 'include'. This is what /web uses against its own
+//     deployment.
+//   • Bearer — `configure({ getToken })` switches the client to fetch a
+//     short-lived user token (minted by the parent app's backend via
+//     /v1/auth/sso/exchange) and attach it as `Authorization: Bearer ...`.
+//     Cookies are NOT sent in this mode so a Stack cookie from a prior
+//     session doesn't leak into a parent-app embedded UI.
 
 export type ClientConfig = {
   // Absolute base URL or same-origin path prefix. Trailing slashes stripped.
@@ -14,6 +15,12 @@ export type ClientConfig = {
   // Optional WebSocket URL override; if unset the realtime client derives one
   // from baseURL (ws:// or wss:// + the same host + /v1/realtime).
   wsURL?: string
+  // When set, every REST request attaches `Authorization: Bearer <token>`
+  // and omits cookies. The function is called per request, so it should be
+  // cheap — cache + refresh the token inside it (typically against your own
+  // backend, which holds the Stack API key and calls /v1/auth/sso/exchange).
+  // Return null to send the request unauthenticated (will 401).
+  getToken?: () => Promise<string | null>
 }
 
 let config: ClientConfig = { baseURL: '/api' }
@@ -40,10 +47,22 @@ export class APIError extends Error {
 }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const headers: Record<string, string> = {}
+  if (body !== undefined) headers['content-type'] = 'application/json'
+
+  // Bearer path: omit cookies entirely so a stale Stack session cookie can't
+  // outrank the token. Cookie path: include credentials so HttpOnly survives.
+  let credentials: RequestCredentials = 'include'
+  if (config.getToken) {
+    const token = await config.getToken()
+    if (token) headers['authorization'] = `Bearer ${token}`
+    credentials = 'omit'
+  }
+
   const res = await fetch(config.baseURL + path, {
     method,
-    credentials: 'include',
-    headers: body !== undefined ? { 'content-type': 'application/json' } : undefined,
+    credentials,
+    headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
   })
   if (res.status === 204) return undefined as T
@@ -288,6 +307,37 @@ export type OperatorUser = {
   last_login_at?: string
   created_at?: string
 }
+
+// Parent app registered with Stack. Each has its own walled-garden workspaces
+// and end users — there is no cross-app messaging. The synthetic 'default'
+// app holds native password-auth users (operators).
+export type OperatorApp = {
+  id: string
+  slug: string
+  name: string
+  description?: string
+  allowed_origins: string[]
+  status: 'active' | 'suspended'
+  created_at: string
+}
+
+// API key metadata. The plaintext is NEVER present on read paths — only
+// the prefix and label. See OperatorAPIKeyWithPlaintext for the one-time
+// creation response.
+export type OperatorAPIKey = {
+  id: string
+  app_id: string
+  key_prefix: string
+  label: string
+  scopes: string[]
+  last_used_at?: string
+  revoked_at?: string
+  created_at: string
+}
+
+// Returned ONCE at key creation. Surface the plaintext to the operator
+// immediately and discard; it cannot be recovered.
+export type OperatorAPIKeyWithPlaintext = OperatorAPIKey & { plaintext: string }
 
 export type OperatorAuditEntry = {
   id: string

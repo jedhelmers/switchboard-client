@@ -1,7 +1,15 @@
-// Tiny WebSocket client. Auth is via the session cookie (sent automatically by the
-// browser on same-origin WS upgrades). Reconnects with capped exponential backoff.
+// Tiny WebSocket client. Two auth paths, picked by client configure():
+//   • Cookie (default) — same-origin upgrade carries the HttpOnly session
+//     cookie. URL is sync, no extra round trip.
+//   • Bearer — the browser can't set Authorization on the WS upgrade, so we
+//     POST /v1/auth/realtime-ticket first (using the bearer user token),
+//     append ?ticket=<one-shot> to the URL, and connect. Tickets are
+//     consumed atomically by the server so reconnect re-fetches.
+//
+// Reconnects with capped exponential backoff. Each reconnect re-resolves
+// the URL, so a fresh ticket is minted on every attempt — never reused.
 
-import { getConfig, type Message } from './client'
+import { api, getConfig, type Message } from './client'
 
 export type RealtimeEvent =
   | { type: 'message.created'; workspace_id: string; channel_id: string; message_id: string; payload: Message; emitted_at: string }
@@ -20,6 +28,12 @@ export type Listener = (ev: RealtimeEvent) => void
 
 export type ConnectionState = 'connecting' | 'open' | 'closed'
 
+// URLResolver returns the full ws(s):// URL to dial. Async to allow the
+// bearer path to fetch a fresh ticket per connect attempt. Strings are
+// accepted at the constructor for backward compatibility with the
+// pre-multi-app cookie-only callers.
+export type URLResolver = string | (() => Promise<string>)
+
 export class RealtimeClient {
   private ws: WebSocket | null = null
   private listeners = new Set<Listener>()
@@ -30,7 +44,11 @@ export class RealtimeClient {
   private stopped = false
   private reconnectTimer: number | null = null
 
-  constructor(private url: string) {}
+  constructor(private url: URLResolver) {}
+
+  private async resolveURL(): Promise<string> {
+    return typeof this.url === 'function' ? this.url() : this.url
+  }
 
   start() {
     this.stopped = false
@@ -67,11 +85,26 @@ export class RealtimeClient {
     this.stateListeners.forEach((l) => l(s))
   }
 
-  private connect() {
+  private async connect() {
     if (this.stopped) return
     this.setState('connecting')
 
-    const ws = new WebSocket(this.url)
+    let url: string
+    try {
+      url = await this.resolveURL()
+    } catch {
+      // URL resolution failed (ticket mint failed, network glitch). Treat
+      // as a connection failure: backoff + retry. Don't get stuck in
+      // 'connecting' forever.
+      this.setState('closed')
+      if (!this.stopped) {
+        this.reconnectTimer = window.setTimeout(() => this.connect(), this.retryDelay)
+        this.retryDelay = Math.min(this.retryDelay * 2, this.maxDelay)
+      }
+      return
+    }
+
+    const ws = new WebSocket(url)
     this.ws = ws
 
     ws.onopen = () => {
@@ -116,4 +149,27 @@ export function realtimeURL(): string {
   }
   const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
   return `${proto}//${window.location.host}${base}/v1/realtime`
+}
+
+// realtimeURLProvider returns the right async URL resolver for the current
+// client config. Bearer mode mints a one-shot ticket per connect; cookie
+// mode returns the static URL.
+//
+// useRealtime calls this once at mount time. The returned function is
+// invoked fresh on every connect attempt — tickets are single-use, and
+// reusing one fails closed at the server.
+export function realtimeURLProvider(): () => Promise<string> {
+  const cfg = getConfig()
+  if (!cfg.getToken) {
+    // Cookie auth: nothing dynamic to resolve.
+    const url = realtimeURL()
+    return async () => url
+  }
+  return async () => {
+    const { ticket } = await api.post<{ ticket: string; expires_in: number }>(
+      '/v1/auth/realtime-ticket',
+    )
+    const sep = realtimeURL().includes('?') ? '&' : '?'
+    return realtimeURL() + sep + 'ticket=' + encodeURIComponent(ticket)
+  }
 }

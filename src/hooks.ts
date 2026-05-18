@@ -20,6 +20,9 @@ import {
   type MentionCounts,
   type MentionNotification,
   type Message,
+  type OperatorAPIKey,
+  type OperatorAPIKeyWithPlaintext,
+  type OperatorApp,
   type OperatorAuditEntry,
   type OperatorChannel,
   type OperatorDM,
@@ -311,7 +314,7 @@ export function setCurrentUser(userId: string | null) {
 // ---- realtime: shared client + cache integration --------------------------
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { RealtimeClient, realtimeURL, type ConnectionState, type RealtimeEvent } from './realtime'
+import { RealtimeClient, realtimeURLProvider, type ConnectionState, type RealtimeEvent } from './realtime'
 import type { QueryClient } from '@tanstack/react-query'
 
 let sharedClient: RealtimeClient | null = null
@@ -514,7 +517,7 @@ export function useRealtime(): ConnectionState {
 
   useEffect(() => {
     if (!sharedClient) {
-      sharedClient = new RealtimeClient(realtimeURL())
+      sharedClient = new RealtimeClient(realtimeURLProvider())
     }
     const c = sharedClient
     const offState = c.onState(setState)
@@ -993,7 +996,7 @@ export function useTypingState(channelId: string | null, currentUserID: string):
 
   useEffect(() => {
     if (!sharedClient) {
-      sharedClient = new RealtimeClient(realtimeURL())
+      sharedClient = new RealtimeClient(realtimeURLProvider())
     }
     const c = sharedClient
 
@@ -1451,5 +1454,58 @@ export function useHealth() {
       return { ok: res.ok, checks: body }
     },
     refetchInterval: 5_000,
+  })
+}
+
+// ---- operator: parent apps + api keys --------------------------------------
+
+export function useOperatorApps() {
+  return useQuery({
+    queryKey: ['op', 'apps'],
+    queryFn: () => api.get<OperatorApp[]>('/v1/operator/apps'),
+    staleTime: 2_000,
+  })
+}
+
+export function useOpCreateApp() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (vars: {
+      slug: string
+      name: string
+      description?: string
+      allowed_origins?: string[]
+    }) => api.post<OperatorApp>('/v1/operator/apps', vars),
+    onSuccess: () => invalidateOperator(qc),
+  })
+}
+
+// Keys are scoped to an app — the query key carries the app id so two apps
+// can be open in different tabs without their key lists stomping each other.
+export function useOperatorAPIKeys(appId: string | null) {
+  return useQuery({
+    queryKey: ['op', 'apps', appId, 'keys'],
+    queryFn: () => api.get<OperatorAPIKey[]>(`/v1/operator/apps/${appId}/api-keys`),
+    enabled: !!appId,
+    staleTime: 2_000,
+  })
+}
+
+// Returns the plaintext as part of the response — the UI must surface it
+// once and then discard. There is no read endpoint that returns plaintext.
+export function useOpCreateAPIKey(appId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (vars: { label: string; scopes: string[] }) =>
+      api.post<OperatorAPIKeyWithPlaintext>(`/v1/operator/apps/${appId}/api-keys`, vars),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['op', 'apps', appId, 'keys'] }),
+  })
+}
+
+export function useOpRevokeAPIKey(appId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (keyId: string) => api.del(`/v1/operator/api-keys/${keyId}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['op', 'apps', appId, 'keys'] }),
   })
 }
