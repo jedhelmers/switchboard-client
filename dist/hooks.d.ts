@@ -15,6 +15,10 @@ export type UpdateMeVars = {
     avatar_object_key?: string;
 };
 export declare function useUpdateMe(): import("@tanstack/react-query").UseMutationResult<User, Error, UpdateMeVars, unknown>;
+export declare function useChangeMyPassword(): import("@tanstack/react-query").UseMutationResult<void, Error, {
+    current_password: string;
+    new_password: string;
+}, unknown>;
 export declare function uploadAvatar(file: File): Promise<string>;
 export declare function useMyWorkspaces(): import("@tanstack/react-query").UseQueryResult<Workspace[], Error>;
 export declare function useChannels(slug: string | null): import("@tanstack/react-query").UseQueryResult<Channel[], Error>;
@@ -155,6 +159,10 @@ export declare function useOpForceLogoutUser(): import("@tanstack/react-query").
     revoked: number;
 }, Error, string, unknown>;
 export declare function useOpDeleteUser(): import("@tanstack/react-query").UseMutationResult<unknown, Error, string, unknown>;
+export declare function useOpResetUserPassword(): import("@tanstack/react-query").UseMutationResult<void, Error, {
+    id: string;
+    new_password: string;
+}, unknown>;
 export declare function useOpAddWorkspaceMember(workspaceID: string): import("@tanstack/react-query").UseMutationResult<WorkspaceMembership, Error, {
     user_id: string;
     role?: WorkspaceMembership["role"];

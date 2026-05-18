@@ -49,6 +49,14 @@ export function useUpdateMe() {
         },
     });
 }
+// Self-service password change. Server validates current_password against
+// the stored hash before accepting the new one. No cache invalidation —
+// the session cookie stays valid.
+export function useChangeMyPassword() {
+    return useMutation({
+        mutationFn: (vars) => api.post('/v1/me/password', vars),
+    });
+}
 // uploadAvatar runs presign → PUT and resolves to the storage object_key the
 // caller should send back via useUpdateMe. Two phases on purpose: we don't
 // commit the avatar to the user row until the bytes are confirmed in S3.
@@ -1201,6 +1209,15 @@ export function useOpDeleteUser() {
     const qc = useQueryClient();
     return useMutation({
         mutationFn: (id) => api.del(`/v1/operator/users/${id}`),
+        onSuccess: () => invalidateOperator(qc),
+    });
+}
+export function useOpResetUserPassword() {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: (vars) => api.post(`/v1/operator/users/${vars.id}/password`, {
+            new_password: vars.new_password,
+        }),
         onSuccess: () => invalidateOperator(qc),
     });
 }
