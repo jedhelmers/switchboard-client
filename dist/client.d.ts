@@ -31,7 +31,6 @@ export type Workspace = {
     name: string;
     description?: string;
     icon_url?: string;
-    owner_user_id: string;
     invite_policy: string;
 };
 export type Channel = {
@@ -157,7 +156,7 @@ export type OperatorWorkspace = {
     slug: string;
     name: string;
     status: string;
-    owner_user_id: string;
+    owner_user_ids: string[];
     member_count: number;
     channel_count: number;
     message_count: number;

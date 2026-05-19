@@ -1,6 +1,6 @@
 {
   "name": "@stack/client",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "TypeScript client + React Query hooks for the Stack chat platform's REST + WebSocket API.",
   "type": "module",
   "main": "./dist/index.js",

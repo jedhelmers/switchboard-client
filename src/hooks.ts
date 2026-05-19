@@ -1377,7 +1377,6 @@ export function useOpCreateWorkspace() {
     mutationFn: (vars: {
       slug: string
       name: string
-      owner_user_id: string
       description?: string
       invite_policy?: string
     }) => api.post<{ id: string; slug: string; name: string }>('/v1/operator/workspaces', vars),

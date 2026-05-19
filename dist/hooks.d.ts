@@ -137,7 +137,6 @@ export declare function useOpCreateWorkspace(): import("@tanstack/react-query").
 }, Error, {
     slug: string;
     name: string;
-    owner_user_id: string;
     description?: string;
     invite_policy?: string;
 }, unknown>;
