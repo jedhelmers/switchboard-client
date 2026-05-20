@@ -440,6 +440,21 @@ function applyRealtimeEvent(qc, ev) {
             qc.invalidateQueries({ queryKey: ['huddle', ev.channel_id] });
             break;
         }
+        case 'huddle.recording_started':
+        case 'huddle.recording_stopped':
+        case 'huddle.recording_ready':
+        case 'huddle.recording_failed': {
+            // Recording lifecycle. Invalidate the per-channel recordings list
+            // so the Huddle UI's "is recording active" check refreshes for all
+            // participants simultaneously. The transcript query for the
+            // specific recording is invalidated separately on ready/failed so
+            // an open transcript panel refetches.
+            qc.invalidateQueries({ queryKey: ['recordings', ev.channel_id] });
+            if (ev.type === 'huddle.recording_ready' || ev.type === 'huddle.recording_failed') {
+                qc.invalidateQueries({ queryKey: ['transcript', ev.payload.recording_id] });
+            }
+            break;
+        }
     }
 }
 // useRealtime maintains a single WS connection for the lifetime of the auth'd
@@ -1372,6 +1387,68 @@ export function useLeaveHuddle(channelId) {
             // Invalidate to nudge the refetch in case WS is closed.
             qc.invalidateQueries({ queryKey: ['huddle', channelId] });
         },
+    });
+}
+// ---- huddle recordings ----------------------------------------------------
+//
+// Three queries + two mutations. The consent banner / chime UI in the
+// Huddle component watches useActiveRecording for cross-participant
+// state, so when ANY participant hits Start, every other participant's
+// banner lights up via the realtime patcher above.
+// useChannelRecordings — full history of recordings in a channel, newest
+// first. Powers any "past recordings" panel. Polled lightly when realtime
+// is closed; otherwise driven by the realtime patcher.
+export function useChannelRecordings(channelId, realtimeOpen = false) {
+    return useQuery({
+        queryKey: ['recordings', channelId],
+        queryFn: () => api.get(`/v1/channels/${channelId}/recordings`),
+        enabled: !!channelId,
+        refetchInterval: realtimeOpen ? false : 5000,
+        refetchIntervalInBackground: false,
+    });
+}
+// useActiveRecording — convenience selector over useChannelRecordings.
+// Returns the first row with status === 'recording', or null. This is
+// what the consent banner watches: when this flips from null → non-null,
+// fire the chime + voice cue.
+export function useActiveRecording(channelId, realtimeOpen = false) {
+    const list = useChannelRecordings(channelId, realtimeOpen);
+    if (!list.data)
+        return null;
+    return list.data.recordings.find((r) => r.status === 'recording') ?? null;
+}
+export function useStartHuddleRecording(channelId) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: () => api.post(`/v1/channels/${channelId}/huddle/recording/start`),
+        onSuccess: () => {
+            // Realtime event will land within ~one tick and the patcher will
+            // invalidate. Invalidate eagerly so the starter's UI doesn't sit
+            // on stale "no recording" state during the round-trip.
+            qc.invalidateQueries({ queryKey: ['recordings', channelId] });
+        },
+    });
+}
+export function useStopHuddleRecording(channelId) {
+    const qc = useQueryClient();
+    return useMutation({
+        // Returns 204 — no body. The realtime huddle.recording_stopped event
+        // is what flips the UI; the mutation is mostly fire-and-forget.
+        mutationFn: () => api.post(`/v1/channels/${channelId}/huddle/recording/stop`),
+        onSuccess: () => {
+            qc.invalidateQueries({ queryKey: ['recordings', channelId] });
+        },
+    });
+}
+// useRecordingTranscript — fetch the segments once a recording is ready.
+// The transcript field is null until status='ready'; the realtime patcher
+// invalidates this cache on huddle.recording_ready so an open panel auto-
+// refreshes when transcription completes.
+export function useRecordingTranscript(recordingId) {
+    return useQuery({
+        queryKey: ['transcript', recordingId],
+        queryFn: () => api.get(`/v1/recordings/${recordingId}/transcript`),
+        enabled: !!recordingId,
     });
 }
 //# sourceMappingURL=hooks.js.map

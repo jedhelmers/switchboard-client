@@ -263,4 +263,35 @@ export type HuddleJoinResponse = {
 export type HuddleStateResponse = {
     huddle: Huddle | null;
 };
+export type HuddleRecordingStatus = 'recording' | 'processing' | 'ready' | 'failed' | 'cancelled';
+export type HuddleRecording = {
+    id: string;
+    huddle_id: string;
+    channel_id: string;
+    workspace_id: string;
+    started_by: string;
+    started_at: string;
+    ended_at?: string;
+    status: HuddleRecordingStatus;
+    egress_ids?: string[];
+    transcript_message_id?: string;
+    failed_reason?: string;
+};
+export type HuddleTranscriptSegment = {
+    speaker_user_id: string;
+    segment_index: number;
+    started_offset_ms: number;
+    ended_offset_ms: number;
+    text: string;
+};
+export type HuddleTranscriptResponse = {
+    recording: HuddleRecording;
+    transcript: HuddleTranscriptSegment[] | null;
+};
+export type HuddleRecordingStartResponse = {
+    recording: HuddleRecording;
+};
+export type HuddleRecordingsListResponse = {
+    recordings: HuddleRecording[];
+};
 //# sourceMappingURL=client.d.ts.map

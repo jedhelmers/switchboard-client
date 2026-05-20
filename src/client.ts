@@ -399,3 +399,67 @@ export type HuddleJoinResponse = {
 export type HuddleStateResponse = {
   huddle: Huddle | null
 }
+
+// ---- huddle recordings ----------------------------------------------------
+//
+// Opt-in recording with self-hosted transcription. The UI surfaces a Record
+// button inside the huddle; clicking it fires huddle.recording_started over
+// the realtime channel so every participant sees the consent banner
+// simultaneously. See HUDDLE.md for the consent model.
+
+export type HuddleRecordingStatus =
+  | 'recording'   // egress is active; participants see the REC banner
+  | 'processing' // egress stopped, transcription job is running
+  | 'ready'      // transcript inserted + system message posted to the channel
+  | 'failed'     // pipeline failed; failed_reason is set
+  | 'cancelled'  // future: explicit cancel without transcript
+
+export type HuddleRecording = {
+  id: string
+  huddle_id: string
+  channel_id: string
+  workspace_id: string
+  started_by: string
+  started_at: string
+  ended_at?: string
+  status: HuddleRecordingStatus
+  // Egress job IDs the server tracks for stop. Not interesting to the UI
+  // except for debugging — exposed for completeness.
+  egress_ids?: string[]
+  // Set once the auto-posted "📝 Transcript ready" message lands in the
+  // channel. UIs can use this to scroll the channel to the message or to
+  // light up the "view transcript" affordance.
+  transcript_message_id?: string
+  failed_reason?: string
+}
+
+export type HuddleTranscriptSegment = {
+  speaker_user_id: string
+  segment_index: number
+  started_offset_ms: number
+  ended_offset_ms: number
+  text: string
+}
+
+// Returned by GET /v1/recordings/:id/transcript. Until status='ready' the
+// transcript field is null and clients should poll or wait for the
+// huddle.recording_ready realtime event.
+export type HuddleTranscriptResponse = {
+  recording: HuddleRecording
+  transcript: HuddleTranscriptSegment[] | null
+}
+
+// Returned by POST /v1/channels/:id/huddle/recording/start. The body is
+// the freshly-inserted recording row. If a recording is already in
+// progress the server returns 409 — see useStartHuddleRecording's error
+// handling.
+export type HuddleRecordingStartResponse = {
+  recording: HuddleRecording
+}
+
+// Returned by GET /v1/channels/:id/recordings. Newest-first, all
+// statuses. Clients filter to status='recording' to find the live one
+// or render the rest as a history list.
+export type HuddleRecordingsListResponse = {
+  recordings: HuddleRecording[]
+}

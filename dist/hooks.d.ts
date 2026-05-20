@@ -1,5 +1,5 @@
 import { type InfiniteData } from '@tanstack/react-query';
-import { type AttachmentFile, type Reaction, type Channel, type DMSummary, type Health, type Invite, type InviteWithToken, type Member, type Mention, type MentionCounts, type MentionNotification, type Message, type OperatorAPIKey, type OperatorAPIKeyWithPlaintext, type OperatorApp, type OperatorAuditEntry, type OperatorChannel, type OperatorDM, type OperatorStats, type OperatorUser, type OperatorWorkspace, type User, type Workspace, type WorkspaceMembership, type Huddle, type HuddleJoinResponse, type HuddleStateResponse } from './client';
+import { type AttachmentFile, type Reaction, type Channel, type DMSummary, type Health, type Invite, type InviteWithToken, type Member, type Mention, type MentionCounts, type MentionNotification, type Message, type OperatorAPIKey, type OperatorAPIKeyWithPlaintext, type OperatorApp, type OperatorAuditEntry, type OperatorChannel, type OperatorDM, type OperatorStats, type OperatorUser, type OperatorWorkspace, type User, type Workspace, type WorkspaceMembership, type Huddle, type HuddleJoinResponse, type HuddleStateResponse, type HuddleRecording, type HuddleRecordingStartResponse, type HuddleRecordingsListResponse, type HuddleTranscriptResponse } from './client';
 export declare function useMe(): import("@tanstack/react-query").UseQueryResult<User | null, Error>;
 export declare function useLogin(): import("@tanstack/react-query").UseMutationResult<User, Error, {
     email: string;
@@ -198,4 +198,10 @@ export declare function useHuddle(channelId: string | null, realtimeOpen?: boole
 export declare function useJoinHuddle(channelId: string | null): import("@tanstack/react-query").UseMutationResult<HuddleJoinResponse, Error, void, unknown>;
 export declare function useLeaveHuddle(channelId: string | null): import("@tanstack/react-query").UseMutationResult<void, Error, void, unknown>;
 export type { Huddle, HuddleJoinResponse, HuddleStateResponse };
+export declare function useChannelRecordings(channelId: string | null, realtimeOpen?: boolean): import("@tanstack/react-query").UseQueryResult<HuddleRecordingsListResponse, Error>;
+export declare function useActiveRecording(channelId: string | null, realtimeOpen?: boolean): HuddleRecording | null;
+export declare function useStartHuddleRecording(channelId: string | null): import("@tanstack/react-query").UseMutationResult<HuddleRecordingStartResponse, Error, void, unknown>;
+export declare function useStopHuddleRecording(channelId: string | null): import("@tanstack/react-query").UseMutationResult<void, Error, void, unknown>;
+export declare function useRecordingTranscript(recordingId: string | null): import("@tanstack/react-query").UseQueryResult<HuddleTranscriptResponse, Error>;
+export type { HuddleRecording, HuddleRecordingStartResponse, HuddleRecordingsListResponse, HuddleTranscriptResponse, };
 //# sourceMappingURL=hooks.d.ts.map
