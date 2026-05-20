@@ -426,6 +426,20 @@ function applyRealtimeEvent(qc, ev) {
             }
             break;
         }
+        case 'huddle.started':
+        case 'huddle.ended':
+        case 'huddle.participant_joined':
+        case 'huddle.participant_left': {
+            // All four huddle events affect the same per-channel slice of state:
+            // "is there a huddle in this channel, and who's in it?". A single
+            // invalidation of the huddle query for the channel covers all cases
+            // — the GET endpoint returns both the huddle row and the active
+            // participant list. Cheap: only refetches when a subscriber (the
+            // channel header's "is huddle active" badge or the Huddle UI itself)
+            // has an active query mounted.
+            qc.invalidateQueries({ queryKey: ['huddle', ev.channel_id] });
+            break;
+        }
     }
 }
 // useRealtime maintains a single WS connection for the lifetime of the auth'd
@@ -1303,6 +1317,61 @@ export function useOpRevokeAPIKey(appId) {
     return useMutation({
         mutationFn: (keyId) => api.del(`/v1/operator/api-keys/${keyId}`),
         onSuccess: () => qc.invalidateQueries({ queryKey: ['op', 'apps', appId, 'keys'] }),
+    });
+}
+// ---- huddles --------------------------------------------------------------
+//
+// Three hooks: useHuddle (subscribe to current state), useJoinHuddle
+// (mint a LiveKit token + register participant), useLeaveHuddle (drop out;
+// last one out closes the room). Realtime patches the ['huddle', channelId]
+// query so every member sees joins/leaves without polling.
+//
+// The hooks intentionally do NOT touch LiveKit's SDK — that's the UI's
+// job. Keeps this package dependency-free of @livekit/* and works for
+// non-React consumers too.
+// useHuddle subscribes to the current huddle state for a channel. Returns
+// `{ huddle: null }` when no huddle is active. Realtime keeps the cache
+// fresh; falls back to polling every 5s when the WS is closed.
+export function useHuddle(channelId, realtimeOpen = false) {
+    return useQuery({
+        queryKey: ['huddle', channelId],
+        queryFn: () => api.get(`/v1/channels/${channelId}/huddle`),
+        enabled: !!channelId,
+        refetchInterval: realtimeOpen ? false : 5000,
+        refetchIntervalInBackground: false,
+    });
+}
+// useJoinHuddle mints a LiveKit JWT and registers the caller as a
+// participant. The response carries the LiveKit URL + token the UI hands
+// to <LiveKitRoom>. Idempotent on the server: calling again refreshes the
+// JWT without bouncing an existing media connection.
+//
+// The mutation also seeds the ['huddle', channelId] cache with the freshly
+// returned huddle state so the UI doesn't have to wait for the realtime
+// event to round-trip before reflecting "I'm now in this huddle".
+export function useJoinHuddle(channelId) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: () => api.post(`/v1/channels/${channelId}/huddle/join`),
+        onSuccess: (res) => {
+            qc.setQueryData(['huddle', channelId], { huddle: res.huddle });
+        },
+    });
+}
+// useLeaveHuddle drops the caller out. Idempotent: leaving when not in is
+// still 204. The last participant out causes the server to close the
+// huddle and fire huddle.ended — the realtime patcher invalidates the
+// query so the UI clears.
+export function useLeaveHuddle(channelId) {
+    const qc = useQueryClient();
+    return useMutation({
+        mutationFn: () => api.post(`/v1/channels/${channelId}/huddle/leave`),
+        onSuccess: () => {
+            // Don't wipe the cache — the WS event will refresh it with the
+            // updated participant list (or null if we were the last one out).
+            // Invalidate to nudge the refetch in case WS is closed.
+            qc.invalidateQueries({ queryKey: ['huddle', channelId] });
+        },
     });
 }
 //# sourceMappingURL=hooks.js.map

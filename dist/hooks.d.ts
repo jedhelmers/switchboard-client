@@ -1,5 +1,5 @@
 import { type InfiniteData } from '@tanstack/react-query';
-import { type AttachmentFile, type Reaction, type Channel, type DMSummary, type Health, type Invite, type InviteWithToken, type Member, type Mention, type MentionCounts, type MentionNotification, type Message, type OperatorAPIKey, type OperatorAPIKeyWithPlaintext, type OperatorApp, type OperatorAuditEntry, type OperatorChannel, type OperatorDM, type OperatorStats, type OperatorUser, type OperatorWorkspace, type User, type Workspace, type WorkspaceMembership } from './client';
+import { type AttachmentFile, type Reaction, type Channel, type DMSummary, type Health, type Invite, type InviteWithToken, type Member, type Mention, type MentionCounts, type MentionNotification, type Message, type OperatorAPIKey, type OperatorAPIKeyWithPlaintext, type OperatorApp, type OperatorAuditEntry, type OperatorChannel, type OperatorDM, type OperatorStats, type OperatorUser, type OperatorWorkspace, type User, type Workspace, type WorkspaceMembership, type Huddle, type HuddleJoinResponse, type HuddleStateResponse } from './client';
 export declare function useMe(): import("@tanstack/react-query").UseQueryResult<User | null, Error>;
 export declare function useLogin(): import("@tanstack/react-query").UseMutationResult<User, Error, {
     email: string;
@@ -194,4 +194,8 @@ export declare function useOpCreateAPIKey(appId: string): import("@tanstack/reac
     scopes: string[];
 }, unknown>;
 export declare function useOpRevokeAPIKey(appId: string): import("@tanstack/react-query").UseMutationResult<unknown, Error, string, unknown>;
+export declare function useHuddle(channelId: string | null, realtimeOpen?: boolean): import("@tanstack/react-query").UseQueryResult<HuddleStateResponse, Error>;
+export declare function useJoinHuddle(channelId: string | null): import("@tanstack/react-query").UseMutationResult<HuddleJoinResponse, Error, void, unknown>;
+export declare function useLeaveHuddle(channelId: string | null): import("@tanstack/react-query").UseMutationResult<void, Error, void, unknown>;
+export type { Huddle, HuddleJoinResponse, HuddleStateResponse };
 //# sourceMappingURL=hooks.d.ts.map

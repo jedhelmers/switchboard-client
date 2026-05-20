@@ -356,3 +356,46 @@ export type WorkspaceMembership = {
   user_id: string
   role: 'owner' | 'admin' | 'member' | 'guest' | 'bot'
 }
+
+// ---- huddles --------------------------------------------------------------
+//
+// Huddles are live audio/video/screen-share rooms scoped to a channel (or
+// DM — DMs are channels under the hood). The Stack server never touches
+// media bytes; it mints a short-lived LiveKit JWT and broadcasts huddle.*
+// realtime events. The client passes `livekit_url` + `livekit_token` to
+// LiveKit's own SDK (`@livekit/components-react`) to actually join the room.
+
+export type HuddleParticipant = {
+  user_id: string
+  joined_at: string
+}
+
+export type Huddle = {
+  id: string
+  channel_id: string
+  workspace_id: string
+  started_by: string
+  started_at: string
+  // Set when the huddle has ended. An active huddle always has this absent.
+  ended_at?: string
+  participants: HuddleParticipant[]
+}
+
+// Returned by POST /v1/channels/{id}/huddle/join. Caller hands livekit_url
+// + livekit_token to <LiveKitRoom> from @livekit/components-react. Tokens
+// are short-lived (default 10m); re-calling join refreshes the token
+// without disrupting an existing connection.
+export type HuddleJoinResponse = {
+  huddle: Huddle
+  livekit_url: string
+  livekit_token: string
+  livekit_token_expires_at: string
+  room: string
+}
+
+// Returned by GET /v1/channels/{id}/huddle. `huddle` is null when no
+// huddle is active in the channel — clients should render the "start
+// huddle" affordance in that case.
+export type HuddleStateResponse = {
+  huddle: Huddle | null
+}

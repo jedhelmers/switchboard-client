@@ -23,6 +23,39 @@ export type RealtimeEvent =
   // channels/dms lists in response.
   | { type: 'membership.added'; workspace_id: string; channel_id: string; target_user_id: string; emitted_at: string }
   | { type: 'membership.removed'; workspace_id: string; channel_id: string; target_user_id: string; emitted_at: string }
+  // Huddle lifecycle — channel-scoped fanout like message events. Every
+  // member of the channel hears these. user_id is the actor (joiner /
+  // leaver); started_by lives in the payload for `huddle.started`.
+  | {
+      type: 'huddle.started'
+      workspace_id: string
+      channel_id: string
+      payload: { huddle_id: string; started_by: string; started_at: string }
+      emitted_at: string
+    }
+  | {
+      type: 'huddle.ended'
+      workspace_id: string
+      channel_id: string
+      payload: { huddle_id: string; ended_at: string; duration_seconds: number }
+      emitted_at: string
+    }
+  | {
+      type: 'huddle.participant_joined'
+      workspace_id: string
+      channel_id: string
+      user_id: string
+      payload: { huddle_id: string; joined_at: string }
+      emitted_at: string
+    }
+  | {
+      type: 'huddle.participant_left'
+      workspace_id: string
+      channel_id: string
+      user_id: string
+      payload: { huddle_id: string; left_at: string }
+      emitted_at: string
+    }
 
 export type Listener = (ev: RealtimeEvent) => void
 

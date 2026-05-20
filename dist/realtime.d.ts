@@ -44,6 +44,46 @@ export type RealtimeEvent = {
     channel_id: string;
     target_user_id: string;
     emitted_at: string;
+} | {
+    type: 'huddle.started';
+    workspace_id: string;
+    channel_id: string;
+    payload: {
+        huddle_id: string;
+        started_by: string;
+        started_at: string;
+    };
+    emitted_at: string;
+} | {
+    type: 'huddle.ended';
+    workspace_id: string;
+    channel_id: string;
+    payload: {
+        huddle_id: string;
+        ended_at: string;
+        duration_seconds: number;
+    };
+    emitted_at: string;
+} | {
+    type: 'huddle.participant_joined';
+    workspace_id: string;
+    channel_id: string;
+    user_id: string;
+    payload: {
+        huddle_id: string;
+        joined_at: string;
+    };
+    emitted_at: string;
+} | {
+    type: 'huddle.participant_left';
+    workspace_id: string;
+    channel_id: string;
+    user_id: string;
+    payload: {
+        huddle_id: string;
+        left_at: string;
+    };
+    emitted_at: string;
 };
 export type Listener = (ev: RealtimeEvent) => void;
 export type ConnectionState = 'connecting' | 'open' | 'closed';

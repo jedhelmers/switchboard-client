@@ -240,4 +240,27 @@ export type WorkspaceMembership = {
     user_id: string;
     role: 'owner' | 'admin' | 'member' | 'guest' | 'bot';
 };
+export type HuddleParticipant = {
+    user_id: string;
+    joined_at: string;
+};
+export type Huddle = {
+    id: string;
+    channel_id: string;
+    workspace_id: string;
+    started_by: string;
+    started_at: string;
+    ended_at?: string;
+    participants: HuddleParticipant[];
+};
+export type HuddleJoinResponse = {
+    huddle: Huddle;
+    livekit_url: string;
+    livekit_token: string;
+    livekit_token_expires_at: string;
+    room: string;
+};
+export type HuddleStateResponse = {
+    huddle: Huddle | null;
+};
 //# sourceMappingURL=client.d.ts.map
