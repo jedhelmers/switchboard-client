@@ -1,20 +1,20 @@
-# @stack/client
+# @switchboard/client
 
 TypeScript client, React Query hooks, and WebSocket helper for the
-[Stack](https://github.com/your-org/stack) chat platform. This package is
+[SwitchBoard](https://github.com/your-org/switchboard) chat platform. This package is
 the same code the official web app uses — it ships every endpoint type, the
 realtime event union, and a hook for every read + mutation surface in the
 REST API.
 
 It does **not** ship UI components. Build your own chat UI on top of these
 hooks (recommended), or, for non-React targets (Android, Swift, etc.), read
-[the API + WebSocket docs](https://github.com/your-org/stack/blob/main/API.md)
+[the API + WebSocket docs](https://github.com/your-org/switchboard/blob/main/API.md)
 to roll a native client.
 
 ## Install
 
 ```bash
-npm install @stack/client @tanstack/react-query react
+npm install @switchboard/client @tanstack/react-query react
 ```
 
 Peer deps: React 18 or 19, `@tanstack/react-query` 5+.
@@ -23,9 +23,9 @@ Peer deps: React 18 or 19, `@tanstack/react-query` 5+.
 
 ```tsx
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { configure, useMe, useMessages, useRealtime } from '@stack/client'
+import { configure, useMe, useMessages, useRealtime } from '@switchboard/client'
 
-// Point the client at your Stack server. Call once on app boot.
+// Point the client at your SwitchBoard server. Call once on app boot.
 configure({ baseURL: 'https://chat.example.com/api' })
 
 const qc = new QueryClient()
@@ -49,13 +49,13 @@ function Chat() {
 
 The session is a same-origin HttpOnly cookie set by `POST /v1/auth/login`,
 so all requests carry it automatically via `credentials: 'include'`. For
-cross-origin embeds, your Stack server must respond with the appropriate
+cross-origin embeds, your SwitchBoard server must respond with the appropriate
 `Access-Control-Allow-Origin` + `Access-Control-Allow-Credentials` headers.
 
 ## Configuration
 
 ```ts
-import { configure } from '@stack/client'
+import { configure } from '@switchboard/client'
 
 configure({
   // Where REST requests go. Absolute URL for cross-origin embeds; same-origin
@@ -68,7 +68,7 @@ configure({
 ```
 
 Configuration is a process-global. There's no per-instance Client object;
-one app talks to one Stack server. Holler if you need multi-tenant.
+one app talks to one SwitchBoard server. Holler if you need multi-tenant.
 
 ## What's in the package
 
@@ -82,7 +82,7 @@ import type {
   AttachmentFile, DMSummary, Invite, InviteWithToken,
   PresignResponse, OperatorAuditEntry, OperatorChannel,
   OperatorUser, OperatorWorkspace,
-} from '@stack/client'
+} from '@switchboard/client'
 ```
 
 ### Hooks
@@ -145,7 +145,7 @@ shapes (`{ data, isLoading, error, ... }` for queries, `{ mutate, isPending,
 ### Realtime
 
 ```ts
-import { RealtimeClient, realtimeURL, type RealtimeEvent } from '@stack/client'
+import { RealtimeClient, realtimeURL, type RealtimeEvent } from '@switchboard/client'
 
 const c = new RealtimeClient(realtimeURL())
 c.on((ev: RealtimeEvent) => {
@@ -163,7 +163,7 @@ custom subscription patterns.
 For one-off requests outside the hook surface:
 
 ```ts
-import { api, APIError } from '@stack/client'
+import { api, APIError } from '@switchboard/client'
 
 try {
   const ws = await api.get<Workspace>(`/v1/workspaces/${slug}`)
@@ -179,5 +179,5 @@ Tracks the server's `/v1` API. Breaking changes to that API would land in
 
 ## See also
 
-- [API.md](https://github.com/your-org/stack/blob/main/API.md) — full HTTP reference
-- [REALTIME.md](https://github.com/your-org/stack/blob/main/REALTIME.md) — WebSocket protocol
+- [API.md](https://github.com/your-org/switchboard/blob/main/API.md) — full HTTP reference
+- [REALTIME.md](https://github.com/your-org/switchboard/blob/main/REALTIME.md) — WebSocket protocol

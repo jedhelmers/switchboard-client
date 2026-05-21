@@ -1,4 +1,4 @@
-// @stack/client — public entry point.
+// @switchboard/client — public entry point.
 //
 // Imports are organized so tree-shaking eliminates whatever a consumer
 // doesn't touch. Most apps will use the React hooks (which transitively

@@ -33,6 +33,13 @@ import {
   type User,
   type Workspace,
   type WorkspaceMembership,
+  type Jam,
+  type JamJoinResponse,
+  type JamStateResponse,
+  type JamRecording,
+  type JamRecordingStartResponse,
+  type JamRecordingsListResponse,
+  type JamTranscriptResponse,
 } from './client'
 
 // ---- auth ------------------------------------------------------------------
@@ -513,6 +520,35 @@ function applyRealtimeEvent(qc: QueryClient, ev: RealtimeEvent) {
         qc.removeQueries({ queryKey: ['messages', ev.channel_id], exact: false })
         qc.invalidateQueries({ queryKey: ['unread'] })
         qc.invalidateQueries({ queryKey: ['mention_counts'] })
+      }
+      break
+    }
+    case 'jam.started':
+    case 'jam.ended':
+    case 'jam.participant_joined':
+    case 'jam.participant_left': {
+      // All four jam events affect the same per-channel slice of state:
+      // "is there a jam in this channel, and who's in it?". A single
+      // invalidation of the jam query for the channel covers all cases
+      // — the GET endpoint returns both the jam row and the active
+      // participant list. Cheap: only refetches when a subscriber (the
+      // channel header's "is jam active" badge or the Jam UI itself)
+      // has an active query mounted.
+      qc.invalidateQueries({ queryKey: ['jam', ev.channel_id] })
+      break
+    }
+    case 'jam.recording_started':
+    case 'jam.recording_stopped':
+    case 'jam.recording_ready':
+    case 'jam.recording_failed': {
+      // Recording lifecycle. Invalidate the per-channel recordings list
+      // so the Jam UI's "is recording active" check refreshes for all
+      // participants simultaneously. The transcript query for the
+      // specific recording is invalidated separately on ready/failed so
+      // an open transcript panel refetches.
+      qc.invalidateQueries({ queryKey: ['recordings', ev.channel_id] })
+      if (ev.type === 'jam.recording_ready' || ev.type === 'jam.recording_failed') {
+        qc.invalidateQueries({ queryKey: ['transcript', ev.payload.recording_id] })
       }
       break
     }
@@ -1578,4 +1614,142 @@ export function useOpRevokeAPIKey(appId: string) {
     mutationFn: (keyId: string) => api.del(`/v1/operator/api-keys/${keyId}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['op', 'apps', appId, 'keys'] }),
   })
+}
+
+// ---- jams --------------------------------------------------------------
+//
+// Three hooks: useJam (subscribe to current state), useJoinJam
+// (mint a LiveKit token + register participant), useLeaveJam (drop out;
+// last one out closes the room). Realtime patches the ['jam', channelId]
+// query so every member sees joins/leaves without polling.
+//
+// The hooks intentionally do NOT touch LiveKit's SDK — that's the UI's
+// job. Keeps this package dependency-free of @livekit/* and works for
+// non-React consumers too.
+
+// useJam subscribes to the current jam state for a channel. Returns
+// `{ jam: null }` when no jam is active. Realtime keeps the cache
+// fresh; falls back to polling every 5s when the WS is closed.
+export function useJam(channelId: string | null, realtimeOpen: boolean = false) {
+  return useQuery<JamStateResponse>({
+    queryKey: ['jam', channelId],
+    queryFn: () => api.get<JamStateResponse>(`/v1/channels/${channelId}/jam`),
+    enabled: !!channelId,
+    refetchInterval: realtimeOpen ? false : 5000,
+    refetchIntervalInBackground: false,
+  })
+}
+
+// useJoinJam mints a LiveKit JWT and registers the caller as a
+// participant. The response carries the LiveKit URL + token the UI hands
+// to <LiveKitRoom>. Idempotent on the server: calling again refreshes the
+// JWT without bouncing an existing media connection.
+//
+// The mutation also seeds the ['jam', channelId] cache with the freshly
+// returned jam state so the UI doesn't have to wait for the realtime
+// event to round-trip before reflecting "I'm now in this jam".
+export function useJoinJam(channelId: string | null) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => api.post<JamJoinResponse>(`/v1/channels/${channelId}/jam/join`),
+    onSuccess: (res) => {
+      qc.setQueryData<JamStateResponse>(['jam', channelId], { jam: res.jam })
+    },
+  })
+}
+
+// useLeaveJam drops the caller out. Idempotent: leaving when not in is
+// still 204. The last participant out causes the server to close the
+// jam and fire jam.ended — the realtime patcher invalidates the
+// query so the UI clears.
+export function useLeaveJam(channelId: string | null) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => api.post<void>(`/v1/channels/${channelId}/jam/leave`),
+    onSuccess: () => {
+      // Don't wipe the cache — the WS event will refresh it with the
+      // updated participant list (or null if we were the last one out).
+      // Invalidate to nudge the refetch in case WS is closed.
+      qc.invalidateQueries({ queryKey: ['jam', channelId] })
+    },
+  })
+}
+
+// Re-export the Jam type the UI will want when destructuring the join
+// response. Avoids forcing consumers to drill into '@switchboard/client' twice.
+export type { Jam, JamJoinResponse, JamStateResponse }
+
+// ---- jam recordings ----------------------------------------------------
+//
+// Three queries + two mutations. The consent banner / chime UI in the
+// Jam component watches useActiveRecording for cross-participant
+// state, so when ANY participant hits Start, every other participant's
+// banner lights up via the realtime patcher above.
+
+// useChannelRecordings — full history of recordings in a channel, newest
+// first. Powers any "past recordings" panel. Polled lightly when realtime
+// is closed; otherwise driven by the realtime patcher.
+export function useChannelRecordings(channelId: string | null, realtimeOpen: boolean = false) {
+  return useQuery<JamRecordingsListResponse>({
+    queryKey: ['recordings', channelId],
+    queryFn: () => api.get<JamRecordingsListResponse>(`/v1/channels/${channelId}/recordings`),
+    enabled: !!channelId,
+    refetchInterval: realtimeOpen ? false : 5000,
+    refetchIntervalInBackground: false,
+  })
+}
+
+// useActiveRecording — convenience selector over useChannelRecordings.
+// Returns the first row with status === 'recording', or null. This is
+// what the consent banner watches: when this flips from null → non-null,
+// fire the chime + voice cue.
+export function useActiveRecording(channelId: string | null, realtimeOpen: boolean = false): JamRecording | null {
+  const list = useChannelRecordings(channelId, realtimeOpen)
+  if (!list.data) return null
+  return list.data.recordings.find((r) => r.status === 'recording') ?? null
+}
+
+export function useStartJamRecording(channelId: string | null) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () =>
+      api.post<JamRecordingStartResponse>(`/v1/channels/${channelId}/jam/recording/start`),
+    onSuccess: () => {
+      // Realtime event will land within ~one tick and the patcher will
+      // invalidate. Invalidate eagerly so the starter's UI doesn't sit
+      // on stale "no recording" state during the round-trip.
+      qc.invalidateQueries({ queryKey: ['recordings', channelId] })
+    },
+  })
+}
+
+export function useStopJamRecording(channelId: string | null) {
+  const qc = useQueryClient()
+  return useMutation({
+    // Returns 204 — no body. The realtime jam.recording_stopped event
+    // is what flips the UI; the mutation is mostly fire-and-forget.
+    mutationFn: () => api.post<void>(`/v1/channels/${channelId}/jam/recording/stop`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['recordings', channelId] })
+    },
+  })
+}
+
+// useRecordingTranscript — fetch the segments once a recording is ready.
+// The transcript field is null until status='ready'; the realtime patcher
+// invalidates this cache on jam.recording_ready so an open panel auto-
+// refreshes when transcription completes.
+export function useRecordingTranscript(recordingId: string | null) {
+  return useQuery<JamTranscriptResponse>({
+    queryKey: ['transcript', recordingId],
+    queryFn: () => api.get<JamTranscriptResponse>(`/v1/recordings/${recordingId}/transcript`),
+    enabled: !!recordingId,
+  })
+}
+
+export type {
+  JamRecording,
+  JamRecordingStartResponse,
+  JamRecordingsListResponse,
+  JamTranscriptResponse,
 }

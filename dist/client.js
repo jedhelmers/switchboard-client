@@ -5,7 +5,7 @@
 //   • Bearer — `configure({ getToken })` switches the client to fetch a
 //     short-lived user token (minted by the parent app's backend via
 //     /v1/auth/sso/exchange) and attach it as `Authorization: Bearer ...`.
-//     Cookies are NOT sent in this mode so a Stack cookie from a prior
+//     Cookies are NOT sent in this mode so a SwitchBoard cookie from a prior
 //     session doesn't leak into a parent-app embedded UI.
 let config = { baseURL: '/api' };
 export function configure(next) {
@@ -30,7 +30,7 @@ async function request(method, path, body) {
     const headers = {};
     if (body !== undefined)
         headers['content-type'] = 'application/json';
-    // Bearer path: omit cookies entirely so a stale Stack session cookie can't
+    // Bearer path: omit cookies entirely so a stale SwitchBoard session cookie can't
     // outrank the token. Cookie path: include credentials so HttpOnly survives.
     let credentials = 'include';
     if (config.getToken) {

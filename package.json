@@ -1,7 +1,7 @@
 {
-  "name": "@stack/client",
+  "name": "@switchboard/client",
   "version": "0.2.6",
-  "description": "TypeScript client + React Query hooks for the Stack chat platform's REST + WebSocket API.",
+  "description": "TypeScript client + React Query hooks for the SwitchBoard chat platform's REST + WebSocket API.",
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -42,7 +42,7 @@
   },
   "sideEffects": false,
   "keywords": [
-    "stack",
+    "switchboard",
     "chat",
     "slack",
     "react",

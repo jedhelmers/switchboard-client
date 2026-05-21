@@ -1,5 +1,5 @@
 import { type InfiniteData } from '@tanstack/react-query';
-import { type AttachmentFile, type Reaction, type Channel, type DMSummary, type Health, type Invite, type InviteWithToken, type Member, type Mention, type MentionCounts, type MentionNotification, type Message, type OperatorAPIKey, type OperatorAPIKeyWithPlaintext, type OperatorApp, type OperatorAuditEntry, type OperatorChannel, type OperatorDM, type OperatorStats, type OperatorUser, type OperatorWorkspace, type User, type Workspace, type WorkspaceMembership } from './client';
+import { type AttachmentFile, type Reaction, type Channel, type DMSummary, type Health, type Invite, type InviteWithToken, type Member, type Mention, type MentionCounts, type MentionNotification, type Message, type OperatorAPIKey, type OperatorAPIKeyWithPlaintext, type OperatorApp, type OperatorAuditEntry, type OperatorChannel, type OperatorDM, type OperatorStats, type OperatorUser, type OperatorWorkspace, type User, type Workspace, type WorkspaceMembership, type Jam, type JamJoinResponse, type JamStateResponse, type JamRecording, type JamRecordingStartResponse, type JamRecordingsListResponse, type JamTranscriptResponse } from './client';
 export declare function useMe(): import("@tanstack/react-query").UseQueryResult<User | null, Error>;
 export declare function useLogin(): import("@tanstack/react-query").UseMutationResult<User, Error, {
     email: string;
@@ -194,4 +194,14 @@ export declare function useOpCreateAPIKey(appId: string): import("@tanstack/reac
     scopes: string[];
 }, unknown>;
 export declare function useOpRevokeAPIKey(appId: string): import("@tanstack/react-query").UseMutationResult<unknown, Error, string, unknown>;
+export declare function useJam(channelId: string | null, realtimeOpen?: boolean): import("@tanstack/react-query").UseQueryResult<JamStateResponse, Error>;
+export declare function useJoinJam(channelId: string | null): import("@tanstack/react-query").UseMutationResult<JamJoinResponse, Error, void, unknown>;
+export declare function useLeaveJam(channelId: string | null): import("@tanstack/react-query").UseMutationResult<void, Error, void, unknown>;
+export type { Jam, JamJoinResponse, JamStateResponse };
+export declare function useChannelRecordings(channelId: string | null, realtimeOpen?: boolean): import("@tanstack/react-query").UseQueryResult<JamRecordingsListResponse, Error>;
+export declare function useActiveRecording(channelId: string | null, realtimeOpen?: boolean): JamRecording | null;
+export declare function useStartJamRecording(channelId: string | null): import("@tanstack/react-query").UseMutationResult<JamRecordingStartResponse, Error, void, unknown>;
+export declare function useStopJamRecording(channelId: string | null): import("@tanstack/react-query").UseMutationResult<void, Error, void, unknown>;
+export declare function useRecordingTranscript(recordingId: string | null): import("@tanstack/react-query").UseQueryResult<JamTranscriptResponse, Error>;
+export type { JamRecording, JamRecordingStartResponse, JamRecordingsListResponse, JamTranscriptResponse, };
 //# sourceMappingURL=hooks.d.ts.map
