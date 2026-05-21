@@ -33,13 +33,13 @@ import {
   type User,
   type Workspace,
   type WorkspaceMembership,
-  type Huddle,
-  type HuddleJoinResponse,
-  type HuddleStateResponse,
-  type HuddleRecording,
-  type HuddleRecordingStartResponse,
-  type HuddleRecordingsListResponse,
-  type HuddleTranscriptResponse,
+  type Jam,
+  type JamJoinResponse,
+  type JamStateResponse,
+  type JamRecording,
+  type JamRecordingStartResponse,
+  type JamRecordingsListResponse,
+  type JamTranscriptResponse,
 } from './client'
 
 // ---- auth ------------------------------------------------------------------
@@ -523,31 +523,31 @@ function applyRealtimeEvent(qc: QueryClient, ev: RealtimeEvent) {
       }
       break
     }
-    case 'huddle.started':
-    case 'huddle.ended':
-    case 'huddle.participant_joined':
-    case 'huddle.participant_left': {
-      // All four huddle events affect the same per-channel slice of state:
-      // "is there a huddle in this channel, and who's in it?". A single
-      // invalidation of the huddle query for the channel covers all cases
-      // — the GET endpoint returns both the huddle row and the active
+    case 'jam.started':
+    case 'jam.ended':
+    case 'jam.participant_joined':
+    case 'jam.participant_left': {
+      // All four jam events affect the same per-channel slice of state:
+      // "is there a jam in this channel, and who's in it?". A single
+      // invalidation of the jam query for the channel covers all cases
+      // — the GET endpoint returns both the jam row and the active
       // participant list. Cheap: only refetches when a subscriber (the
-      // channel header's "is huddle active" badge or the Huddle UI itself)
+      // channel header's "is jam active" badge or the Jam UI itself)
       // has an active query mounted.
-      qc.invalidateQueries({ queryKey: ['huddle', ev.channel_id] })
+      qc.invalidateQueries({ queryKey: ['jam', ev.channel_id] })
       break
     }
-    case 'huddle.recording_started':
-    case 'huddle.recording_stopped':
-    case 'huddle.recording_ready':
-    case 'huddle.recording_failed': {
+    case 'jam.recording_started':
+    case 'jam.recording_stopped':
+    case 'jam.recording_ready':
+    case 'jam.recording_failed': {
       // Recording lifecycle. Invalidate the per-channel recordings list
-      // so the Huddle UI's "is recording active" check refreshes for all
+      // so the Jam UI's "is recording active" check refreshes for all
       // participants simultaneously. The transcript query for the
       // specific recording is invalidated separately on ready/failed so
       // an open transcript panel refetches.
       qc.invalidateQueries({ queryKey: ['recordings', ev.channel_id] })
-      if (ev.type === 'huddle.recording_ready' || ev.type === 'huddle.recording_failed') {
+      if (ev.type === 'jam.recording_ready' || ev.type === 'jam.recording_failed') {
         qc.invalidateQueries({ queryKey: ['transcript', ev.payload.recording_id] })
       }
       break
@@ -1616,73 +1616,73 @@ export function useOpRevokeAPIKey(appId: string) {
   })
 }
 
-// ---- huddles --------------------------------------------------------------
+// ---- jams --------------------------------------------------------------
 //
-// Three hooks: useHuddle (subscribe to current state), useJoinHuddle
-// (mint a LiveKit token + register participant), useLeaveHuddle (drop out;
-// last one out closes the room). Realtime patches the ['huddle', channelId]
+// Three hooks: useJam (subscribe to current state), useJoinJam
+// (mint a LiveKit token + register participant), useLeaveJam (drop out;
+// last one out closes the room). Realtime patches the ['jam', channelId]
 // query so every member sees joins/leaves without polling.
 //
 // The hooks intentionally do NOT touch LiveKit's SDK — that's the UI's
 // job. Keeps this package dependency-free of @livekit/* and works for
 // non-React consumers too.
 
-// useHuddle subscribes to the current huddle state for a channel. Returns
-// `{ huddle: null }` when no huddle is active. Realtime keeps the cache
+// useJam subscribes to the current jam state for a channel. Returns
+// `{ jam: null }` when no jam is active. Realtime keeps the cache
 // fresh; falls back to polling every 5s when the WS is closed.
-export function useHuddle(channelId: string | null, realtimeOpen: boolean = false) {
-  return useQuery<HuddleStateResponse>({
-    queryKey: ['huddle', channelId],
-    queryFn: () => api.get<HuddleStateResponse>(`/v1/channels/${channelId}/huddle`),
+export function useJam(channelId: string | null, realtimeOpen: boolean = false) {
+  return useQuery<JamStateResponse>({
+    queryKey: ['jam', channelId],
+    queryFn: () => api.get<JamStateResponse>(`/v1/channels/${channelId}/jam`),
     enabled: !!channelId,
     refetchInterval: realtimeOpen ? false : 5000,
     refetchIntervalInBackground: false,
   })
 }
 
-// useJoinHuddle mints a LiveKit JWT and registers the caller as a
+// useJoinJam mints a LiveKit JWT and registers the caller as a
 // participant. The response carries the LiveKit URL + token the UI hands
 // to <LiveKitRoom>. Idempotent on the server: calling again refreshes the
 // JWT without bouncing an existing media connection.
 //
-// The mutation also seeds the ['huddle', channelId] cache with the freshly
-// returned huddle state so the UI doesn't have to wait for the realtime
-// event to round-trip before reflecting "I'm now in this huddle".
-export function useJoinHuddle(channelId: string | null) {
+// The mutation also seeds the ['jam', channelId] cache with the freshly
+// returned jam state so the UI doesn't have to wait for the realtime
+// event to round-trip before reflecting "I'm now in this jam".
+export function useJoinJam(channelId: string | null) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: () => api.post<HuddleJoinResponse>(`/v1/channels/${channelId}/huddle/join`),
+    mutationFn: () => api.post<JamJoinResponse>(`/v1/channels/${channelId}/jam/join`),
     onSuccess: (res) => {
-      qc.setQueryData<HuddleStateResponse>(['huddle', channelId], { huddle: res.huddle })
+      qc.setQueryData<JamStateResponse>(['jam', channelId], { jam: res.jam })
     },
   })
 }
 
-// useLeaveHuddle drops the caller out. Idempotent: leaving when not in is
+// useLeaveJam drops the caller out. Idempotent: leaving when not in is
 // still 204. The last participant out causes the server to close the
-// huddle and fire huddle.ended — the realtime patcher invalidates the
+// jam and fire jam.ended — the realtime patcher invalidates the
 // query so the UI clears.
-export function useLeaveHuddle(channelId: string | null) {
+export function useLeaveJam(channelId: string | null) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: () => api.post<void>(`/v1/channels/${channelId}/huddle/leave`),
+    mutationFn: () => api.post<void>(`/v1/channels/${channelId}/jam/leave`),
     onSuccess: () => {
       // Don't wipe the cache — the WS event will refresh it with the
       // updated participant list (or null if we were the last one out).
       // Invalidate to nudge the refetch in case WS is closed.
-      qc.invalidateQueries({ queryKey: ['huddle', channelId] })
+      qc.invalidateQueries({ queryKey: ['jam', channelId] })
     },
   })
 }
 
-// Re-export the Huddle type the UI will want when destructuring the join
-// response. Avoids forcing consumers to drill into '@stack/client' twice.
-export type { Huddle, HuddleJoinResponse, HuddleStateResponse }
+// Re-export the Jam type the UI will want when destructuring the join
+// response. Avoids forcing consumers to drill into '@switchboard/client' twice.
+export type { Jam, JamJoinResponse, JamStateResponse }
 
-// ---- huddle recordings ----------------------------------------------------
+// ---- jam recordings ----------------------------------------------------
 //
 // Three queries + two mutations. The consent banner / chime UI in the
-// Huddle component watches useActiveRecording for cross-participant
+// Jam component watches useActiveRecording for cross-participant
 // state, so when ANY participant hits Start, every other participant's
 // banner lights up via the realtime patcher above.
 
@@ -1690,9 +1690,9 @@ export type { Huddle, HuddleJoinResponse, HuddleStateResponse }
 // first. Powers any "past recordings" panel. Polled lightly when realtime
 // is closed; otherwise driven by the realtime patcher.
 export function useChannelRecordings(channelId: string | null, realtimeOpen: boolean = false) {
-  return useQuery<HuddleRecordingsListResponse>({
+  return useQuery<JamRecordingsListResponse>({
     queryKey: ['recordings', channelId],
-    queryFn: () => api.get<HuddleRecordingsListResponse>(`/v1/channels/${channelId}/recordings`),
+    queryFn: () => api.get<JamRecordingsListResponse>(`/v1/channels/${channelId}/recordings`),
     enabled: !!channelId,
     refetchInterval: realtimeOpen ? false : 5000,
     refetchIntervalInBackground: false,
@@ -1703,17 +1703,17 @@ export function useChannelRecordings(channelId: string | null, realtimeOpen: boo
 // Returns the first row with status === 'recording', or null. This is
 // what the consent banner watches: when this flips from null → non-null,
 // fire the chime + voice cue.
-export function useActiveRecording(channelId: string | null, realtimeOpen: boolean = false): HuddleRecording | null {
+export function useActiveRecording(channelId: string | null, realtimeOpen: boolean = false): JamRecording | null {
   const list = useChannelRecordings(channelId, realtimeOpen)
   if (!list.data) return null
   return list.data.recordings.find((r) => r.status === 'recording') ?? null
 }
 
-export function useStartHuddleRecording(channelId: string | null) {
+export function useStartJamRecording(channelId: string | null) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: () =>
-      api.post<HuddleRecordingStartResponse>(`/v1/channels/${channelId}/huddle/recording/start`),
+      api.post<JamRecordingStartResponse>(`/v1/channels/${channelId}/jam/recording/start`),
     onSuccess: () => {
       // Realtime event will land within ~one tick and the patcher will
       // invalidate. Invalidate eagerly so the starter's UI doesn't sit
@@ -1723,12 +1723,12 @@ export function useStartHuddleRecording(channelId: string | null) {
   })
 }
 
-export function useStopHuddleRecording(channelId: string | null) {
+export function useStopJamRecording(channelId: string | null) {
   const qc = useQueryClient()
   return useMutation({
-    // Returns 204 — no body. The realtime huddle.recording_stopped event
+    // Returns 204 — no body. The realtime jam.recording_stopped event
     // is what flips the UI; the mutation is mostly fire-and-forget.
-    mutationFn: () => api.post<void>(`/v1/channels/${channelId}/huddle/recording/stop`),
+    mutationFn: () => api.post<void>(`/v1/channels/${channelId}/jam/recording/stop`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['recordings', channelId] })
     },
@@ -1737,19 +1737,19 @@ export function useStopHuddleRecording(channelId: string | null) {
 
 // useRecordingTranscript — fetch the segments once a recording is ready.
 // The transcript field is null until status='ready'; the realtime patcher
-// invalidates this cache on huddle.recording_ready so an open panel auto-
+// invalidates this cache on jam.recording_ready so an open panel auto-
 // refreshes when transcription completes.
 export function useRecordingTranscript(recordingId: string | null) {
-  return useQuery<HuddleTranscriptResponse>({
+  return useQuery<JamTranscriptResponse>({
     queryKey: ['transcript', recordingId],
-    queryFn: () => api.get<HuddleTranscriptResponse>(`/v1/recordings/${recordingId}/transcript`),
+    queryFn: () => api.get<JamTranscriptResponse>(`/v1/recordings/${recordingId}/transcript`),
     enabled: !!recordingId,
   })
 }
 
 export type {
-  HuddleRecording,
-  HuddleRecordingStartResponse,
-  HuddleRecordingsListResponse,
-  HuddleTranscriptResponse,
+  JamRecording,
+  JamRecordingStartResponse,
+  JamRecordingsListResponse,
+  JamTranscriptResponse,
 }

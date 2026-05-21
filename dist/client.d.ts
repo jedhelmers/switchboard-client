@@ -240,58 +240,58 @@ export type WorkspaceMembership = {
     user_id: string;
     role: 'owner' | 'admin' | 'member' | 'guest' | 'bot';
 };
-export type HuddleParticipant = {
+export type JamParticipant = {
     user_id: string;
     joined_at: string;
 };
-export type Huddle = {
+export type Jam = {
     id: string;
     channel_id: string;
     workspace_id: string;
     started_by: string;
     started_at: string;
     ended_at?: string;
-    participants: HuddleParticipant[];
+    participants: JamParticipant[];
 };
-export type HuddleJoinResponse = {
-    huddle: Huddle;
+export type JamJoinResponse = {
+    jam: Jam;
     livekit_url: string;
     livekit_token: string;
     livekit_token_expires_at: string;
     room: string;
 };
-export type HuddleStateResponse = {
-    huddle: Huddle | null;
+export type JamStateResponse = {
+    jam: Jam | null;
 };
-export type HuddleRecordingStatus = 'recording' | 'processing' | 'ready' | 'failed' | 'cancelled';
-export type HuddleRecording = {
+export type JamRecordingStatus = 'recording' | 'processing' | 'ready' | 'failed' | 'cancelled';
+export type JamRecording = {
     id: string;
-    huddle_id: string;
+    jam_id: string;
     channel_id: string;
     workspace_id: string;
     started_by: string;
     started_at: string;
     ended_at?: string;
-    status: HuddleRecordingStatus;
+    status: JamRecordingStatus;
     egress_ids?: string[];
     transcript_message_id?: string;
     failed_reason?: string;
 };
-export type HuddleTranscriptSegment = {
+export type JamTranscriptSegment = {
     speaker_user_id: string;
     segment_index: number;
     started_offset_ms: number;
     ended_offset_ms: number;
     text: string;
 };
-export type HuddleTranscriptResponse = {
-    recording: HuddleRecording;
-    transcript: HuddleTranscriptSegment[] | null;
+export type JamTranscriptResponse = {
+    recording: JamRecording;
+    transcript: JamTranscriptSegment[] | null;
 };
-export type HuddleRecordingStartResponse = {
-    recording: HuddleRecording;
+export type JamRecordingStartResponse = {
+    recording: JamRecording;
 };
-export type HuddleRecordingsListResponse = {
-    recordings: HuddleRecording[];
+export type JamRecordingsListResponse = {
+    recordings: JamRecording[];
 };
 //# sourceMappingURL=client.d.ts.map

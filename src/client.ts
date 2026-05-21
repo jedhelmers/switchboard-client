@@ -5,7 +5,7 @@
 //   • Bearer — `configure({ getToken })` switches the client to fetch a
 //     short-lived user token (minted by the parent app's backend via
 //     /v1/auth/sso/exchange) and attach it as `Authorization: Bearer ...`.
-//     Cookies are NOT sent in this mode so a Stack cookie from a prior
+//     Cookies are NOT sent in this mode so a SwitchBoard cookie from a prior
 //     session doesn't leak into a parent-app embedded UI.
 
 export type ClientConfig = {
@@ -18,7 +18,7 @@ export type ClientConfig = {
   // When set, every REST request attaches `Authorization: Bearer <token>`
   // and omits cookies. The function is called per request, so it should be
   // cheap — cache + refresh the token inside it (typically against your own
-  // backend, which holds the Stack API key and calls /v1/auth/sso/exchange).
+  // backend, which holds the SwitchBoard API key and calls /v1/auth/sso/exchange).
   // Return null to send the request unauthenticated (will 401).
   getToken?: () => Promise<string | null>
 }
@@ -50,7 +50,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   const headers: Record<string, string> = {}
   if (body !== undefined) headers['content-type'] = 'application/json'
 
-  // Bearer path: omit cookies entirely so a stale Stack session cookie can't
+  // Bearer path: omit cookies entirely so a stale SwitchBoard session cookie can't
   // outrank the token. Cookie path: include credentials so HttpOnly survives.
   let credentials: RequestCredentials = 'include'
   if (config.getToken) {
@@ -307,7 +307,7 @@ export type OperatorUser = {
   created_at?: string
 }
 
-// Parent app registered with Stack. Each has its own walled-garden workspaces
+// Parent app registered with SwitchBoard. Each has its own walled-garden workspaces
 // and end users — there is no cross-app messaging. The synthetic 'default'
 // app holds native password-auth users (operators).
 export type OperatorApp = {
@@ -357,72 +357,72 @@ export type WorkspaceMembership = {
   role: 'owner' | 'admin' | 'member' | 'guest' | 'bot'
 }
 
-// ---- huddles --------------------------------------------------------------
+// ---- jams --------------------------------------------------------------
 //
-// Huddles are live audio/video/screen-share rooms scoped to a channel (or
-// DM — DMs are channels under the hood). The Stack server never touches
-// media bytes; it mints a short-lived LiveKit JWT and broadcasts huddle.*
+// Jams are live audio/video/screen-share rooms scoped to a channel (or
+// DM — DMs are channels under the hood). The SwitchBoard server never touches
+// media bytes; it mints a short-lived LiveKit JWT and broadcasts jam.*
 // realtime events. The client passes `livekit_url` + `livekit_token` to
 // LiveKit's own SDK (`@livekit/components-react`) to actually join the room.
 
-export type HuddleParticipant = {
+export type JamParticipant = {
   user_id: string
   joined_at: string
 }
 
-export type Huddle = {
+export type Jam = {
   id: string
   channel_id: string
   workspace_id: string
   started_by: string
   started_at: string
-  // Set when the huddle has ended. An active huddle always has this absent.
+  // Set when the jam has ended. An active jam always has this absent.
   ended_at?: string
-  participants: HuddleParticipant[]
+  participants: JamParticipant[]
 }
 
-// Returned by POST /v1/channels/{id}/huddle/join. Caller hands livekit_url
+// Returned by POST /v1/channels/{id}/jam/join. Caller hands livekit_url
 // + livekit_token to <LiveKitRoom> from @livekit/components-react. Tokens
 // are short-lived (default 10m); re-calling join refreshes the token
 // without disrupting an existing connection.
-export type HuddleJoinResponse = {
-  huddle: Huddle
+export type JamJoinResponse = {
+  jam: Jam
   livekit_url: string
   livekit_token: string
   livekit_token_expires_at: string
   room: string
 }
 
-// Returned by GET /v1/channels/{id}/huddle. `huddle` is null when no
-// huddle is active in the channel — clients should render the "start
-// huddle" affordance in that case.
-export type HuddleStateResponse = {
-  huddle: Huddle | null
+// Returned by GET /v1/channels/{id}/jam. `jam` is null when no
+// jam is active in the channel — clients should render the "start
+// jam" affordance in that case.
+export type JamStateResponse = {
+  jam: Jam | null
 }
 
-// ---- huddle recordings ----------------------------------------------------
+// ---- jam recordings ----------------------------------------------------
 //
 // Opt-in recording with self-hosted transcription. The UI surfaces a Record
-// button inside the huddle; clicking it fires huddle.recording_started over
+// button inside the jam; clicking it fires jam.recording_started over
 // the realtime channel so every participant sees the consent banner
-// simultaneously. See HUDDLE.md for the consent model.
+// simultaneously. See JAM.md for the consent model.
 
-export type HuddleRecordingStatus =
+export type JamRecordingStatus =
   | 'recording'   // egress is active; participants see the REC banner
   | 'processing' // egress stopped, transcription job is running
   | 'ready'      // transcript inserted + system message posted to the channel
   | 'failed'     // pipeline failed; failed_reason is set
   | 'cancelled'  // future: explicit cancel without transcript
 
-export type HuddleRecording = {
+export type JamRecording = {
   id: string
-  huddle_id: string
+  jam_id: string
   channel_id: string
   workspace_id: string
   started_by: string
   started_at: string
   ended_at?: string
-  status: HuddleRecordingStatus
+  status: JamRecordingStatus
   // Egress job IDs the server tracks for stop. Not interesting to the UI
   // except for debugging — exposed for completeness.
   egress_ids?: string[]
@@ -433,7 +433,7 @@ export type HuddleRecording = {
   failed_reason?: string
 }
 
-export type HuddleTranscriptSegment = {
+export type JamTranscriptSegment = {
   speaker_user_id: string
   segment_index: number
   started_offset_ms: number
@@ -443,23 +443,23 @@ export type HuddleTranscriptSegment = {
 
 // Returned by GET /v1/recordings/:id/transcript. Until status='ready' the
 // transcript field is null and clients should poll or wait for the
-// huddle.recording_ready realtime event.
-export type HuddleTranscriptResponse = {
-  recording: HuddleRecording
-  transcript: HuddleTranscriptSegment[] | null
+// jam.recording_ready realtime event.
+export type JamTranscriptResponse = {
+  recording: JamRecording
+  transcript: JamTranscriptSegment[] | null
 }
 
-// Returned by POST /v1/channels/:id/huddle/recording/start. The body is
+// Returned by POST /v1/channels/:id/jam/recording/start. The body is
 // the freshly-inserted recording row. If a recording is already in
-// progress the server returns 409 — see useStartHuddleRecording's error
+// progress the server returns 409 — see useStartJamRecording's error
 // handling.
-export type HuddleRecordingStartResponse = {
-  recording: HuddleRecording
+export type JamRecordingStartResponse = {
+  recording: JamRecording
 }
 
 // Returned by GET /v1/channels/:id/recordings. Newest-first, all
 // statuses. Clients filter to status='recording' to find the live one
 // or render the rest as a history list.
-export type HuddleRecordingsListResponse = {
-  recordings: HuddleRecording[]
+export type JamRecordingsListResponse = {
+  recordings: JamRecording[]
 }
