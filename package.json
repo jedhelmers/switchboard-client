@@ -18,6 +18,10 @@
     "./realtime": {
       "types": "./dist/realtime.d.ts",
       "import": "./dist/realtime.js"
+    },
+    "./api": {
+      "types": "./dist/api/types.d.ts",
+      "import": "./dist/api/types.js"
     }
   },
   "files": [
@@ -28,7 +32,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "prepare": "npm run build",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "gen:types": "openapi-typescript ../Stack/openapi/switchboard.v1.yaml -o src/api/types.ts"
   },
   "peerDependencies": {
     "@tanstack/react-query": "^5.0.0",
@@ -37,6 +42,7 @@
   "devDependencies": {
     "@tanstack/react-query": "^5.62.0",
     "@types/react": "^18.3.12",
+    "openapi-typescript": "^7.13.0",
     "react": "^18.3.1",
     "typescript": "^5.6.3"
   },

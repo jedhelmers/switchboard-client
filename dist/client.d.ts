@@ -10,10 +10,13 @@ export declare class APIError extends Error {
     detail: string;
     constructor(status: number, title: string, detail: string);
 }
+export type RequestOptions = {
+    idempotencyKey?: string;
+};
 export declare const api: {
     get: <T>(p: string) => Promise<T>;
-    post: <T>(p: string, body?: unknown) => Promise<T>;
-    patch: <T>(p: string, body?: unknown) => Promise<T>;
+    post: <T>(p: string, body?: unknown, opts?: RequestOptions) => Promise<T>;
+    patch: <T>(p: string, body?: unknown, opts?: RequestOptions) => Promise<T>;
     del: <T>(p: string) => Promise<T>;
 };
 export type User = {

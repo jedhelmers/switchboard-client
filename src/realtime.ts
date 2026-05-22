@@ -8,10 +8,21 @@
 //
 // Reconnects with capped exponential backoff. Each reconnect re-resolves
 // the URL, so a fresh ticket is minted on every attempt — never reused.
+//
+// Reconnect/resume: every server event carries a monotonic `seq`. The
+// client tracks the highest seq it has observed and appends
+// `?last_event_id=<seq>` on reconnect so the server replays everything
+// that happened while the socket was down. If the gap is larger than the
+// server's replay buffer, the server emits a `system.resync` frame — the
+// client surfaces that to listeners so caches can be invalidated.
 
 import { api, getConfig, type Message } from './client'
 
-export type RealtimeEvent =
+// Every event carries `seq` (server-assigned monotonic) — used by the
+// client to drive last_event_id on reconnect.
+type WithSeq = { seq: number }
+
+export type RealtimeEvent = WithSeq & (
   | { type: 'message.created'; workspace_id: string; channel_id: string; message_id: string; payload: Message; emitted_at: string }
   | { type: 'message.updated'; workspace_id: string; channel_id: string; message_id: string; payload: Message; emitted_at: string }
   | { type: 'message.deleted'; workspace_id: string; channel_id: string; message_id: string; payload: Message; emitted_at: string }
@@ -87,6 +98,12 @@ export type RealtimeEvent =
       payload: { recording_id: string; jam_id: string; reason: string }
       emitted_at: string
     }
+  // Server signal that the client's reconnect position is older than the
+  // replay buffer (gap too wide). Consumers should treat this as "your
+  // caches may be stale — refetch authoritative state." React Query
+  // consumers typically respond by invalidating all queries.
+  | { type: 'system.resync'; reason: string; emitted_at: string }
+)
 
 export type Listener = (ev: RealtimeEvent) => void
 
@@ -107,11 +124,30 @@ export class RealtimeClient {
   private readonly maxDelay = 30_000
   private stopped = false
   private reconnectTimer: number | null = null
+  // Highest seq observed across the lifetime of this client (survives
+  // reconnects). 0 means "fresh connect, no resume position" — the server
+  // treats that as "start from now" and won't replay.
+  private lastEventID = 0
 
   constructor(private url: URLResolver) {}
 
   private async resolveURL(): Promise<string> {
-    return typeof this.url === 'function' ? this.url() : this.url
+    const base = typeof this.url === 'function' ? await this.url() : this.url
+    if (this.lastEventID <= 0) return base
+    const sep = base.includes('?') ? '&' : '?'
+    return base + sep + 'last_event_id=' + this.lastEventID
+  }
+
+  /** Highest server seq this client has observed. Useful for debugging
+   *  and for callers that want to persist the position across page reloads. */
+  getLastEventID(): number {
+    return this.lastEventID
+  }
+
+  /** Seed the last-event-id from persisted state (e.g., sessionStorage)
+   *  before calling start(). After start() the value is managed internally. */
+  setLastEventID(seq: number): void {
+    if (seq > this.lastEventID) this.lastEventID = seq
   }
 
   start() {
@@ -182,6 +218,16 @@ export class RealtimeClient {
         parsed = JSON.parse(evt.data)
       } catch {
         return
+      }
+      // Track highest seq so the next reconnect can resume from it. Skip
+      // system.resync — its seq is informational (it doesn't represent a
+      // real wire event we'd want to replay past).
+      if (
+        typeof parsed.seq === 'number' &&
+        parsed.seq > this.lastEventID &&
+        parsed.type !== 'system.resync'
+      ) {
+        this.lastEventID = parsed.seq
       }
       this.listeners.forEach((l) => l(parsed))
     }

@@ -1,5 +1,8 @@
 import { type Message } from './client';
-export type RealtimeEvent = {
+type WithSeq = {
+    seq: number;
+};
+export type RealtimeEvent = WithSeq & ({
     type: 'message.created';
     workspace_id: string;
     channel_id: string;
@@ -125,7 +128,11 @@ export type RealtimeEvent = {
         reason: string;
     };
     emitted_at: string;
-};
+} | {
+    type: 'system.resync';
+    reason: string;
+    emitted_at: string;
+});
 export type Listener = (ev: RealtimeEvent) => void;
 export type ConnectionState = 'connecting' | 'open' | 'closed';
 export type URLResolver = string | (() => Promise<string>);
@@ -139,8 +146,15 @@ export declare class RealtimeClient {
     private readonly maxDelay;
     private stopped;
     private reconnectTimer;
+    private lastEventID;
     constructor(url: URLResolver);
     private resolveURL;
+    /** Highest server seq this client has observed. Useful for debugging
+     *  and for callers that want to persist the position across page reloads. */
+    getLastEventID(): number;
+    /** Seed the last-event-id from persisted state (e.g., sessionStorage)
+     *  before calling start(). After start() the value is managed internally. */
+    setLastEventID(seq: number): void;
     start(): void;
     stop(): void;
     on(listener: Listener): () => void;
@@ -150,4 +164,5 @@ export declare class RealtimeClient {
 }
 export declare function realtimeURL(): string;
 export declare function realtimeURLProvider(): () => Promise<string>;
+export {};
 //# sourceMappingURL=realtime.d.ts.map

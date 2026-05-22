@@ -249,6 +249,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { RealtimeClient, realtimeURLProvider } from './realtime';
 let sharedClient = null;
 function applyRealtimeEvent(qc, ev) {
+    // system.resync: the WS reconnected, but we were offline longer than the
+    // server's replay buffer can replay. Our caches may be stale. Nuke
+    // everything — React Query will refetch on next read. Don't try to be
+    // surgical (no channel_id to scope on, no way to know what we missed).
+    if (ev.type === 'system.resync') {
+        qc.invalidateQueries();
+        return;
+    }
     // useMessages keys queries by ['messages', channelId, anchorId ?? ''] so
     // changing the anchor (e.g. from a search-result jump) gets a fresh fetch.
     // Realtime patches need to update EVERY cached variant for the channel —

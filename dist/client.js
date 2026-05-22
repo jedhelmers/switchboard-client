@@ -26,10 +26,12 @@ export class APIError extends Error {
         this.detail = detail;
     }
 }
-async function request(method, path, body) {
+async function request(method, path, body, opts) {
     const headers = {};
     if (body !== undefined)
         headers['content-type'] = 'application/json';
+    if (opts?.idempotencyKey)
+        headers['idempotency-key'] = opts.idempotencyKey;
     // Bearer path: omit cookies entirely so a stale SwitchBoard session cookie can't
     // outrank the token. Cookie path: include credentials so HttpOnly survives.
     let credentials = 'include';
@@ -58,8 +60,8 @@ async function request(method, path, body) {
 }
 export const api = {
     get: (p) => request('GET', p),
-    post: (p, body) => request('POST', p, body),
-    patch: (p, body) => request('PATCH', p, body),
+    post: (p, body, opts) => request('POST', p, body, opts),
+    patch: (p, body, opts) => request('PATCH', p, body, opts),
     del: (p) => request('DELETE', p),
 };
 //# sourceMappingURL=client.js.map
