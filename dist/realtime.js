@@ -8,6 +8,13 @@
 //
 // Reconnects with capped exponential backoff. Each reconnect re-resolves
 // the URL, so a fresh ticket is minted on every attempt — never reused.
+//
+// Reconnect/resume: every server event carries a monotonic `seq`. The
+// client tracks the highest seq it has observed and appends
+// `?last_event_id=<seq>` on reconnect so the server replays everything
+// that happened while the socket was down. If the gap is larger than the
+// server's replay buffer, the server emits a `system.resync` frame — the
+// client surfaces that to listeners so caches can be invalidated.
 import { api, getConfig } from './client';
 export class RealtimeClient {
     url;
@@ -19,11 +26,30 @@ export class RealtimeClient {
     maxDelay = 30_000;
     stopped = false;
     reconnectTimer = null;
+    // Highest seq observed across the lifetime of this client (survives
+    // reconnects). 0 means "fresh connect, no resume position" — the server
+    // treats that as "start from now" and won't replay.
+    lastEventID = 0;
     constructor(url) {
         this.url = url;
     }
     async resolveURL() {
-        return typeof this.url === 'function' ? this.url() : this.url;
+        const base = typeof this.url === 'function' ? await this.url() : this.url;
+        if (this.lastEventID <= 0)
+            return base;
+        const sep = base.includes('?') ? '&' : '?';
+        return base + sep + 'last_event_id=' + this.lastEventID;
+    }
+    /** Highest server seq this client has observed. Useful for debugging
+     *  and for callers that want to persist the position across page reloads. */
+    getLastEventID() {
+        return this.lastEventID;
+    }
+    /** Seed the last-event-id from persisted state (e.g., sessionStorage)
+     *  before calling start(). After start() the value is managed internally. */
+    setLastEventID(seq) {
+        if (seq > this.lastEventID)
+            this.lastEventID = seq;
     }
     start() {
         this.stopped = false;
@@ -88,6 +114,14 @@ export class RealtimeClient {
             }
             catch {
                 return;
+            }
+            // Track highest seq so the next reconnect can resume from it. Skip
+            // system.resync — its seq is informational (it doesn't represent a
+            // real wire event we'd want to replay past).
+            if (typeof parsed.seq === 'number' &&
+                parsed.seq > this.lastEventID &&
+                parsed.type !== 'system.resync') {
+                this.lastEventID = parsed.seq;
             }
             this.listeners.forEach((l) => l(parsed));
         };

@@ -46,9 +46,29 @@ export class APIError extends Error {
   }
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+// Per-request options. Currently just idempotencyKey, but the shape is the
+// place to add per-call AbortSignal, timeout, custom headers, etc.
+export type RequestOptions = {
+  // Sent as the `Idempotency-Key` header. The server caches the response
+  // for ~24h keyed on (user, method, path, key); a retry with the same key
+  // returns the cached response instead of re-running the handler. Useful
+  // for "send message" / "create channel" mutations where a network blip
+  // would otherwise cause a duplicate. Currently honored by /v1/messages
+  // POST, /v1/messages/{id}/reactions POST, /v1/auth/login,
+  // /v1/auth/sso/exchange, and a handful of operator routes — see the
+  // OpenAPI spec for the canonical list. Other routes ignore the header.
+  //
+  // Generate the key client-side (crypto.randomUUID()) at the moment of
+  // user intent (e.g., when the user hits "Send") and reuse it across
+  // automatic retries. Never auto-generate per-fetch — that defeats the
+  // dedup since each request gets a fresh key.
+  idempotencyKey?: string
+}
+
+async function request<T>(method: string, path: string, body?: unknown, opts?: RequestOptions): Promise<T> {
   const headers: Record<string, string> = {}
   if (body !== undefined) headers['content-type'] = 'application/json'
+  if (opts?.idempotencyKey) headers['idempotency-key'] = opts.idempotencyKey
 
   // Bearer path: omit cookies entirely so a stale SwitchBoard session cookie can't
   // outrank the token. Cookie path: include credentials so HttpOnly survives.
@@ -78,8 +98,8 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 
 export const api = {
   get: <T>(p: string) => request<T>('GET', p),
-  post: <T>(p: string, body?: unknown) => request<T>('POST', p, body),
-  patch: <T>(p: string, body?: unknown) => request<T>('PATCH', p, body),
+  post: <T>(p: string, body?: unknown, opts?: RequestOptions) => request<T>('POST', p, body, opts),
+  patch: <T>(p: string, body?: unknown, opts?: RequestOptions) => request<T>('PATCH', p, body, opts),
   del: <T>(p: string) => request<T>('DELETE', p),
 }
 

@@ -85,6 +85,24 @@ import type {
 } from '@switchboard/client'
 ```
 
+#### Generated types (from the OpenAPI spec)
+
+For any wire shape not re-exported from the root (or to pin against the
+spec exactly), import from the `/api` subpath:
+
+```ts
+import type { paths, components, operations } from '@switchboard/client/api'
+
+type User = components['schemas']['User']
+type ListWorkspacesResp = paths['/v1/workspaces']['get']['responses']['200']['content']['application/json']
+```
+
+These are regenerated from `openapi/switchboard.v1.yaml` in the server repo
+via `npm run gen:types`. The script assumes the server repo is checked out
+as a sibling directory (`../Stack`). The hand-rolled types above will stay
+around as ergonomic aliases — the generated set is the canonical contract
+and is what Tauri/Electron/mobile clients should code against.
+
 ### Hooks
 
 Conventionally named after the verb + resource. All return TanStack Query
