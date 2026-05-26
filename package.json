@@ -22,6 +22,10 @@
     "./api": {
       "types": "./dist/api/types.d.ts",
       "import": "./dist/api/types.js"
+    },
+    "./mrkdwn": {
+      "types": "./dist/mrkdwn/index.d.ts",
+      "import": "./dist/mrkdwn/index.js"
     }
   },
   "files": [
@@ -33,6 +37,7 @@
     "build": "tsc -p tsconfig.build.json",
     "prepare": "npm run build",
     "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test src/mrkdwn/parser.test.ts",
     "gen:types": "openapi-typescript ../Stack/openapi/switchboard.v1.yaml -o src/api/types.ts"
   },
   "peerDependencies": {
@@ -41,9 +46,11 @@
   },
   "devDependencies": {
     "@tanstack/react-query": "^5.62.0",
+    "@types/node": "^20.14.0",
     "@types/react": "^18.3.12",
     "openapi-typescript": "^7.13.0",
     "react": "^18.3.1",
+    "tsx": "^4.19.0",
     "typescript": "^5.6.3"
   },
   "sideEffects": false,
