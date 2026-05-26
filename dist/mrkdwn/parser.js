@@ -2,6 +2,8 @@
 // Mirrors server/internal/mrkdwn/ in the switchboard-server repo, and
 // passes the same MRKDWN_FIXTURES.json oracle. See MRKDWN.md for the
 // dialect spec.
+// Magic-comment language hint pattern. See MRKDWN.md §3 rule 8a.
+const MAGIC_COMMENT_RE = /^\s*(?:\/\/|#|--|<!--)\s*([a-z][a-z0-9+#-]*)/;
 export function parse(input) {
     const normalized = input.replace(/\r\n/g, '\n');
     const lines = normalized.split('\n');
@@ -40,7 +42,7 @@ export function plainText(input) {
     return parse(input).map(blockToPlain).join('\n');
 }
 function parseFencedCode(lines, start) {
-    const lang = lines[start].slice(3).trim();
+    let lang = lines[start].slice(3).trim();
     const body = [];
     let i = start + 1;
     while (i < lines.length && !lines[i].startsWith('```')) {
@@ -49,7 +51,13 @@ function parseFencedCode(lines, start) {
     }
     if (i < lines.length)
         i++; // consume closing fence
-    return { node: { type: 'code_block', lang, value: body.join('\n') }, next: i };
+    const value = body.join('\n');
+    if (lang === '' && body.length > 0) {
+        const m = MAGIC_COMMENT_RE.exec(body[0]);
+        if (m)
+            lang = m[1];
+    }
+    return { node: { type: 'code_block', lang, value }, next: i };
 }
 function isBlockquoteLine(line) {
     return line === '>' || line.startsWith('> ');

@@ -5,6 +5,9 @@
 
 import type { MrkdwnNode, MrkdwnStyle } from './types.js'
 
+// Magic-comment language hint pattern. See MRKDWN.md §3 rule 8a.
+const MAGIC_COMMENT_RE = /^\s*(?:\/\/|#|--|<!--)\s*([a-z][a-z0-9+#-]*)/
+
 export function parse(input: string): MrkdwnNode[] {
   const normalized = input.replace(/\r\n/g, '\n')
   const lines = normalized.split('\n')
@@ -49,7 +52,7 @@ function parseFencedCode(
   lines: string[],
   start: number,
 ): { node: MrkdwnNode; next: number } {
-  const lang = lines[start].slice(3).trim()
+  let lang = lines[start].slice(3).trim()
   const body: string[] = []
   let i = start + 1
   while (i < lines.length && !lines[i].startsWith('```')) {
@@ -57,7 +60,12 @@ function parseFencedCode(
     i++
   }
   if (i < lines.length) i++ // consume closing fence
-  return { node: { type: 'code_block', lang, value: body.join('\n') }, next: i }
+  const value = body.join('\n')
+  if (lang === '' && body.length > 0) {
+    const m = MAGIC_COMMENT_RE.exec(body[0])
+    if (m) lang = m[1]
+  }
+  return { node: { type: 'code_block', lang, value }, next: i }
 }
 
 function isBlockquoteLine(line: string): boolean {
